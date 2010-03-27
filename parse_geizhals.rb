@@ -48,11 +48,10 @@ module Geizhals
         FIELD_FIRST = /^[^A-Za-z_]/
         FIELD_REST = /[^A-Za-z0-9_]/
         FIELD_MAX_LEN = 20
-        FIELD_TYPE = 'GAUGE'
         LABEL_EXCLUDE = /[#\\]/
         LABEL_MAX_LEN = 32
 
-        def self.config(html, graph_opts = {})
+        def self.config(html, type = 'lines', graph_opts = {})
             fields = get_fields html
             if !graph_opts.key? 'graph_title'
                 graph_opts['graph_title'] = 'Wishlist'
@@ -61,10 +60,23 @@ module Geizhals
             graph_opts.each { |k,v|
                 out << "#{k} #{v}\n"
             }
+            first = true
             fields.keys.sort.each { |k|
                 out << "#{k}.label #{fields[k][0..LABEL_MAX_LEN]}\n"
-                out << "#{k}.type #{FIELD_TYPE}\n"
+                out << "#{k}.type GAUGE\n"
+                if type == 'area'
+                    if first
+                        out << "#{k}.draw AREA\n"
+                        first = false
+                    else
+                        out << "#{k}.draw STACK\n"
+                    end
+                end
             }
+            if type == 'lines_with_total'
+                out << "sum.label Sum\n"
+                out << "sum.type GAUGE\n"
+            end
             out
         end
         def self.get_fields(html)
@@ -89,12 +101,18 @@ module Geizhals
         def self.normalize_label(label)
             label.gsub(LABEL_EXCLUDE, ' ').gsub(/ +/, ' ').strip
         end
-        def self.data(html)
+        def self.data(html, type = 'lines')
             data = Geizhals.parse_wishlist html 
             out = ''
+            sum_price = 0
             data.keys.sort.each { |name|
-                out << "#{normalize_field name}.value #{data[name][:price]}\n"
+                price = data[name][:price] * data[name][:count]
+                out << "#{normalize_field name}.value #{price}\n"
+                sum_price += price
             }
+            if type == 'lines_with_total'
+                out << "sum.value #{sum_price}\n"
+            end
             out
         end
         def self.get_html_source
@@ -111,9 +129,16 @@ end
 if $0 == __FILE__
     $stdout.sync = true
 
-    if ARGV[0] == 'config'
-        puts Geizhals::Munin.config Geizhals::Munin.get_html_source
+    type = ENV['type']
+
+    if ARGV[0] == 'autoconf'
+        puts "no\n"
+        exit 1
+    elsif ARGV[0] == 'config'
+        puts Geizhals::Munin.config(Geizhals::Munin.get_html_source, type)
     else
-        puts Geizhals::Munin.data Geizhals::Munin.get_html_source
+        puts Geizhals::Munin.data(Geizhals::Munin.get_html_source, type)
     end
+
+    exit 0
 end
