@@ -1,0 +1,7 @@
+A munin plug-in to graph geizhals wishlists.
+
+What is munin? See http://munin-monitoring.org/
+
+What is geizhals? See http://geizhals.at/
+
+Documentation is part of the ruby source.
